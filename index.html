@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TITAN ULTRA | Cloud Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;900&display=swap');
+        body { font-family: 'Outfit', sans-serif; background: #050508; color: white; margin: 0; overflow: hidden; }
+        .bebas { font-family: 'Bebas Neue', cursive; }
+        .editor-canvas { background: #000; position: relative; aspect-ratio: 16/9; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        .btn-active:active { transform: scale(0.95); transition: 0.1s; }
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="h-screen flex flex-col">
+        <!-- HEADER -->
+        <header class="p-6 flex justify-between items-center shrink-0">
+            <h1 class="text-xl font-black italic tracking-tighter">TITAN <span class="text-indigo-500">ULTRA</span></h1>
+            <button onclick="addFolder()" class="w-12 h-12 bg-white text-black rounded-2xl flex items-center justify-center btn-active">
+                <i class="fa-solid fa-folder-plus text-xl"></i>
+            </button>
+        </header>
+
+        <!-- VIEW: FOLDERS -->
+        <main id="view-folders" class="flex-1 overflow-y-auto px-6 pb-20">
+            <div id="folder-list" class="grid grid-cols-2 gap-4"></div>
+        </main>
+
+        <!-- VIEW: PROJECTS -->
+        <main id="view-projects" class="hidden flex-1 overflow-y-auto px-6 pb-20">
+            <div class="flex items-center gap-4 mb-6">
+                <button onclick="showView('folders')" class="bg-zinc-900 p-4 rounded-xl"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 id="folder-title" class="text-lg font-black uppercase tracking-widest">FOLDER</h2>
+            </div>
+            <button onclick="addProject()" class="w-full bg-indigo-600 p-5 rounded-3xl mb-6 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20">New Production</button>
+            <div id="project-list" class="space-y-4"></div>
+        </main>
+
+        <!-- VIEW: EDITOR -->
+        <main id="view-editor" class="fixed inset-0 bg-black z-[100] hidden flex flex-col">
+            <nav class="h-16 px-6 flex justify-between items-center border-b border-white/5 bg-zinc-950">
+                <button onclick="showView('projects')" class="text-[10px] font-black uppercase">Exit</button>
+                <button onclick="alert('Render Engine Starting...')" class="bg-white text-black px-4 py-2 rounded-lg text-[10px] font-black uppercase">Render</button>
+            </nav>
+            <div id="editor-canvas" class="editor-canvas">
+                <img id="layer-bg" src="https://images.unsplash.com/photo-1614850523296-d8c1af93d400?w=800" class="absolute inset-0 w-full h-full object-cover opacity-60">
+                <h2 id="layer-text" class="bebas text-white text-6xl text-center px-4 z-10 drop-shadow-2xl">EDIT TEXT</h2>
+            </div>
+            <div class="p-8 space-y-8 bg-[#0a0a0c] flex-1">
+                <input id="edit-text-input" type="text" oninput="updateText(this.value)" class="w-full bg-zinc-900 border border-white/5 p-5 rounded-2xl font-black uppercase text-lg outline-none focus:border-indigo-600">
+                <div class="flex justify-around">
+                    <div onclick="updateColor('#ffffff')" class="w-12 h-12 rounded-2xl bg-white"></div>
+                    <div onclick="updateColor('#6366f1')" class="w-12 h-12 rounded-2xl bg-indigo-600"></div>
+                    <div onclick="updateColor('#f59e0b')" class="w-12 h-12 rounded-2xl bg-yellow-500"></div>
+                    <div onclick="updateColor('#ef4444')" class="w-12 h-12 rounded-2xl bg-rose-500"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('titan_db')) || { folders: [{id: 1, name: 'MAIN'}], projects: [] };
+        let currentFolderId = null, currentProjectId = null;
+
+        function showView(v) {
+            ['folders', 'projects', 'editor'].forEach(x => document.getElementById('view-'+x).classList.add('hidden'));
+            document.getElementById('view-'+v).classList.remove('hidden');
+        }
+
+        function renderFolders() {
+            const list = document.getElementById('folder-list');
+            list.innerHTML = '';
+            db.folders.forEach(f => {
+                const count = db.projects.filter(p => p.folderId === f.id).length;
+                list.innerHTML += `<div onclick="openFolder(${f.id}, '${f.name}')" class="bg-zinc-900 p-6 rounded-[2.5rem] flex flex-col items-center gap-3 btn-active border border-white/5">
+                    <i class="fa-solid fa-folder text-3xl text-indigo-500"></i>
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-center truncate w-full">${f.name}</h3>
+                    <p class="text-[8px] font-bold text-zinc-600">${count} ITEMS</p>
+                </div>`;
+            });
+        }
+
+        function addFolder() {
+            const name = prompt("Folder Name:").toUpperCase();
+            if(name) { db.folders.push({id: Date.now(), name}); save(); renderFolders(); }
+        }
+
+        function openFolder(id, name) {
+            currentFolderId = id; document.getElementById('folder-title').innerText = name;
+            showView('projects'); renderProjects();
+        }
+
+        function renderProjects() {
+            const list = document.getElementById('project-list'); list.innerHTML = '';
+            db.projects.filter(p => p.folderId === currentFolderId).forEach(p => {
+                list.innerHTML += `<div onclick="openEditor(${p.id})" class="bg-zinc-900/50 p-4 rounded-3xl flex items-center gap-4 border border-white/5 btn-active">
+                    <img src="${p.bg}" class="w-16 aspect-video object-cover rounded-xl opacity-50 border border-white/5">
+                    <span class="text-[10px] font-black uppercase truncate flex-1 tracking-widest">${p.text}</span>
+                    <i class="fa-solid fa-chevron-right text-zinc-800 mr-2"></i>
+                </div>`;
+            });
+        }
+
+        function addProject() {
+            const id = Date.now();
+            db.projects.push({id, folderId: currentFolderId, text: 'NEW DESIGN', color: '#ffffff', bg: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800'});
+            save(); openEditor(id);
+        }
+
+        function openEditor(id) {
+            currentProjectId = id; const p = db.projects.find(x => x.id === id);
+            document.getElementById('layer-text').innerText = p.text;
+            document.getElementById('layer-text').style.color = p.color;
+            document.getElementById('edit-text-input').value = p.text;
+            showView('editor');
+        }
+
+        function updateText(v) {
+            const t = v.toUpperCase(); document.getElementById('layer-text').innerText = t;
+            db.projects.find(x => x.id === currentProjectId).text = t; save();
+        }
+
+        function updateColor(c) {
+            document.getElementById('layer-text').style.color = c;
+            db.projects.find(x => x.id === currentProjectId).color = c; save();
+        }
+
+        function save() { localStorage.setItem('titan_db', JSON.stringify(db)); }
+        renderFolders();
+    </script>
+</body>
+</html>
+
+  
