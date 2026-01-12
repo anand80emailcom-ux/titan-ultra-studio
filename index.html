@@ -135,5 +135,489 @@
     </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TITAN ULTRA PRO | Full Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;900&display=swap');
+        body { font-family: 'Outfit', sans-serif; background: #050508; color: white; margin: 0; overflow: hidden; }
+        .bebas { font-family: 'Bebas Neue', cursive; }
+        .editor-container { position: relative; width: 100%; aspect-ratio: 16/9; background: #111; overflow: hidden; border: 1px solid #333; }
+        .draggable { position: absolute; cursor: move; user-select: none; touch-action: none; }
+        .btn-active:active { transform: scale(0.95); transition: 0.1s; }
+        .tool-btn { background: #1a1a1e; padding: 12px; border-radius: 12px; border: 1px solid #333; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 10px; font-weight: 900; }
+    </style>
+</head>
+<body>
 
-  
+    <div id="app" class="h-screen flex flex-col">
+        <!-- HEADER -->
+        <header class="p-4 flex justify-between items-center border-b border-white/5">
+            <h1 class="text-lg font-black italic">TITAN <span class="text-indigo-500">ULTRA PRO</span></h1>
+            <div class="flex gap-2">
+                <button onclick="addFolder()" class="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center btn-active"><i class="fa-solid fa-folder-plus"></i></button>
+            </div>
+        </header>
+
+        <!-- VIEW: FOLDERS -->
+        <main id="view-folders" class="flex-1 overflow-y-auto p-4">
+            <h2 class="text-xs font-black uppercase text-zinc-500 mb-4 tracking-widest">My Folders</h2>
+            <div id="folder-list" class="grid grid-cols-2 gap-3"></div>
+        </main>
+
+        <!-- VIEW: PROJECTS -->
+        <main id="view-projects" class="hidden flex-1 overflow-y-auto p-4">
+            <div class="flex items-center gap-4 mb-6">
+                <button onclick="showView('folders')" class="bg-zinc-900 p-3 rounded-xl"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 id="folder-title" class="font-black uppercase tracking-widest">FOLDER</h2>
+            </div>
+            <button onclick="addProject()" class="w-full bg-indigo-600 p-4 rounded-2xl mb-6 font-black uppercase text-xs">Create New Thumbnail</button>
+            <div id="project-list" class="space-y-3"></div>
+        </main>
+
+        <!-- VIEW: EDITOR (THE REAL DEAL) -->
+        <main id="view-editor" class="fixed inset-0 bg-black z-[200] hidden flex flex-col">
+            <nav class="p-4 flex justify-between items-center bg-zinc-950">
+                <button onclick="showView('projects')" class="text-xs font-black uppercase"><i class="fa-solid fa-chevron-left mr-1"></i> Back</button>
+                <button onclick="downloadImage()" class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-download mr-1"></i> SAVE PNG</button>
+            </nav>
+
+            <!-- CANVAS AREA -->
+            <div id="capture-area" class="editor-container">
+                <img id="canvas-bg" src="https://images.unsplash.com/photo-1614850523296-d8c1af93d400?w=1000" class="w-full h-full object-cover">
+                <div id="main-text" class="draggable bebas text-white text-6xl text-center drop-shadow-2xl" style="top: 30%; left: 10%;">EDIT TEXT</div>
+                <div id="overlay-images"></div>
+            </div>
+
+            <!-- TOOLS AREA -->
+            <div class="flex-1 bg-zinc-900/50 p-4 overflow-y-auto space-y-6">
+                <!-- Text Edit -->
+                <div>
+                    <label class="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">Text & Color</label>
+                    <div class="flex gap-2">
+                        <input id="text-input" type="text" oninput="updateEditorText(this.value)" class="flex-1 bg-black p-4 rounded-xl text-sm border border-white/10 outline-none focus:border-indigo-500">
+                        <input type="color" onchange="updateEditorColor(this.value)" class="w-14 h-14 bg-transparent border-none">
+                    </div>
+                </div>
+
+                <!-- Action Tools -->
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="document.getElementById('bg-upload').click()" class="tool-btn">
+                        <i class="fa-solid fa-image text-indigo-400 text-xl"></i>
+                        Change BG
+                    </button>
+                    <button onclick="document.getElementById('img-upload').click()" class="tool-btn">
+                        <i class="fa-solid fa-plus-circle text-emerald-400 text-xl"></i>
+                        Add Sticker
+                    </button>
+                    <button onclick="resetTextPos()" class="tool-btn">
+                        <i class="fa-solid fa-arrows-rotate text-amber-400 text-xl"></i>
+                        Center Text
+                    </button>
+                </div>
+
+                <!-- Hidden Inputs -->
+                <input type="file" id="bg-upload" class="hidden" accept="image/*" onchange="uploadImage(event, 'bg')">
+                <input type="file" id="img-upload" class="hidden" accept="image/*" onchange="uploadImage(event, 'layer')">
+
+                <p class="text-center text-[9px] text-zinc-600 font-black uppercase tracking-widest pt-4">Drag elements on screen to reposition</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('titan_pro_db')) || { folders: [{id: 1, name: 'MY WORK'}], projects: [] };
+        let currentFolderId = null, currentProjectId = null;
+
+        // Navigation
+        function showView(v) {
+            ['folders', 'projects', 'editor'].forEach(x => document.getElementById('view-'+x).classList.add('hidden'));
+            document.getElementById('view-'+v).classList.remove('hidden');
+        }
+
+        // Folder Management
+        function renderFolders() {
+            const list = document.getElementById('folder-list');
+            list.innerHTML = '';
+            db.folders.forEach(f => {
+                list.innerHTML += `<div onclick="openFolder(${f.id}, '${f.name}')" class="bg-zinc-900 p-5 rounded-3xl flex flex-col items-center gap-2 border border-white/5">
+                    <i class="fa-solid fa-folder text-4xl text-indigo-500"></i>
+                    <h3 class="text-[10px] font-black uppercase truncate w-full text-center">${f.name}</h3>
+                </div>`;
+            });
+        }
+
+        function addFolder() {
+            const n = prompt("Folder Name:");
+            if(n) { db.folders.push({id: Date.now(), name: n.toUpperCase()}); save(); renderFolders(); }
+        }
+
+        function openFolder(id, name) {
+            currentFolderId = id; document.getElementById('folder-title').innerText = name;
+            showView('projects'); renderProjects();
+        }
+
+        // Project Management
+        function renderProjects() {
+            const list = document.getElementById('project-list'); list.innerHTML = '';
+            db.projects.filter(p => p.folderId === currentFolderId).forEach(p => {
+                list.innerHTML += `<div onclick="openEditor(${p.id})" class="bg-zinc-900/50 p-4 rounded-2xl flex items-center gap-4 border border-white/5">
+                    <img src="${p.bg}" class="w-16 h-9 object-cover rounded-lg">
+                    <span class="text-xs font-black uppercase flex-1">${p.text}</span>
+                </div>`;
+            });
+        }
+
+        function addProject() {
+            const id = Date.now();
+            db.projects.push({id, folderId: currentFolderId, text: 'NEW THUMBNAIL', bg: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?w=1000', color: '#ffffff'});
+            save(); openEditor(id);
+        }
+
+        // Editor Logic
+        function openEditor(id) {
+            currentProjectId = id; 
+            const p = db.projects.find(x => x.id === id);
+            document.getElementById('main-text').innerText = p.text;
+            document.getElementById('main-text').style.color = p.color;
+            document.getElementById('text-input').value = p.text;
+            document.getElementById('canvas-bg').src = p.bg;
+            showView('editor');
+            makeDraggable(document.getElementById('main-text'));
+        }
+
+        function updateEditorText(v) {
+            document.getElementById('main-text').innerText = v.toUpperCase();
+            db.projects.find(x => x.id === currentProjectId).text = v.toUpperCase();
+            save();
+        }
+
+        function updateEditorColor(c) {
+            document.getElementById('main-text').style.color = c;
+            db.projects.find(x => x.id === currentProjectId).color = c;
+            save();
+        }
+
+        function uploadImage(event, type) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                if(type === 'bg') {
+                    document.getElementById('canvas-bg').src = reader.result;
+                    db.projects.find(x => x.id === currentProjectId).bg = reader.result;
+                    save();
+                } else {
+                    const img = document.createElement('img');
+                    img.src = reader.result;
+                    img.className = 'draggable w-32';
+                    img.style.top = '20%'; img.style.left = '20%';
+                    document.getElementById('overlay-images').appendChild(img);
+                    makeDraggable(img);
+                }
+            }
+            reader.readAsDataURL(event.target.files[0]);
+        }
+
+        function resetTextPos() {
+            const t = document.getElementById('main-text');
+            t.style.top = '40%'; t.style.left = '10%';
+        }
+
+        // Drag and Drop Logic (Mobile & Desktop)
+        function makeDraggable(el) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            el.onmousedown = dragMouseDown;
+            el.ontouchstart = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                pos3 = clientX; pos4 = clientY;
+                document.onmouseup = closeDragElement;
+                document.ontouchend = closeDragElement;
+                document.onmousemove = elementDrag;
+                document.ontouchmove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                pos1 = pos3 - clientX; pos2 = pos4 - clientY;
+                pos3 = clientX; pos4 = clientY;
+                el.style.top = (el.offsetTop - pos2) + "px";
+                el.style.left = (el.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null; document.onmousemove = null;
+                document.ontouchend = null; document.ontouchmove = null;
+            }
+        }
+
+        // Download PNG
+        function downloadImage() {
+            const area = document.getElementById('capture-area');
+            html2canvas(area, { useCORS: true }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'thumbnail-titan.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        function save() { localStorage.setItem('titan_pro_db', JSON.stringify(db)); }
+        renderFolders();
+    </script>
+</body>
+</html>
+
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TITAN ULTRA PRO | Full Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;900&display=swap');
+        body { font-family: 'Outfit', sans-serif; background: #050508; color: white; margin: 0; overflow: hidden; }
+        .bebas { font-family: 'Bebas Neue', cursive; }
+        .editor-container { position: relative; width: 100%; aspect-ratio: 16/9; background: #111; overflow: hidden; border: 1px solid #333; }
+        .draggable { position: absolute; cursor: move; user-select: none; touch-action: none; }
+        .btn-active:active { transform: scale(0.95); transition: 0.1s; }
+        .tool-btn { background: #1a1a1e; padding: 12px; border-radius: 12px; border: 1px solid #333; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 10px; font-weight: 900; }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="h-screen flex flex-col">
+        <!-- HEADER -->
+        <header class="p-4 flex justify-between items-center border-b border-white/5">
+            <h1 class="text-lg font-black italic">TITAN <span class="text-indigo-500">ULTRA PRO</span></h1>
+            <div class="flex gap-2">
+                <button onclick="addFolder()" class="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center btn-active"><i class="fa-solid fa-folder-plus"></i></button>
+            </div>
+        </header>
+
+        <!-- VIEW: FOLDERS -->
+        <main id="view-folders" class="flex-1 overflow-y-auto p-4">
+            <h2 class="text-xs font-black uppercase text-zinc-500 mb-4 tracking-widest">My Folders</h2>
+            <div id="folder-list" class="grid grid-cols-2 gap-3"></div>
+        </main>
+
+        <!-- VIEW: PROJECTS -->
+        <main id="view-projects" class="hidden flex-1 overflow-y-auto p-4">
+            <div class="flex items-center gap-4 mb-6">
+                <button onclick="showView('folders')" class="bg-zinc-900 p-3 rounded-xl"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 id="folder-title" class="font-black uppercase tracking-widest">FOLDER</h2>
+            </div>
+            <button onclick="addProject()" class="w-full bg-indigo-600 p-4 rounded-2xl mb-6 font-black uppercase text-xs">Create New Thumbnail</button>
+            <div id="project-list" class="space-y-3"></div>
+        </main>
+
+        <!-- VIEW: EDITOR (THE REAL DEAL) -->
+        <main id="view-editor" class="fixed inset-0 bg-black z-[200] hidden flex flex-col">
+            <nav class="p-4 flex justify-between items-center bg-zinc-950">
+                <button onclick="showView('projects')" class="text-xs font-black uppercase"><i class="fa-solid fa-chevron-left mr-1"></i> Back</button>
+                <button onclick="downloadImage()" class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-black"><i class="fa-solid fa-download mr-1"></i> SAVE PNG</button>
+            </nav>
+
+            <!-- CANVAS AREA -->
+            <div id="capture-area" class="editor-container">
+                <img id="canvas-bg" src="https://images.unsplash.com/photo-1614850523296-d8c1af93d400?w=1000" class="w-full h-full object-cover">
+                <div id="main-text" class="draggable bebas text-white text-6xl text-center drop-shadow-2xl" style="top: 30%; left: 10%;">EDIT TEXT</div>
+                <div id="overlay-images"></div>
+            </div>
+
+            <!-- TOOLS AREA -->
+            <div class="flex-1 bg-zinc-900/50 p-4 overflow-y-auto space-y-6">
+                <!-- Text Edit -->
+                <div>
+                    <label class="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">Text & Color</label>
+                    <div class="flex gap-2">
+                        <input id="text-input" type="text" oninput="updateEditorText(this.value)" class="flex-1 bg-black p-4 rounded-xl text-sm border border-white/10 outline-none focus:border-indigo-500">
+                        <input type="color" onchange="updateEditorColor(this.value)" class="w-14 h-14 bg-transparent border-none">
+                    </div>
+                </div>
+
+                <!-- Action Tools -->
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="document.getElementById('bg-upload').click()" class="tool-btn">
+                        <i class="fa-solid fa-image text-indigo-400 text-xl"></i>
+                        Change BG
+                    </button>
+                    <button onclick="document.getElementById('img-upload').click()" class="tool-btn">
+                        <i class="fa-solid fa-plus-circle text-emerald-400 text-xl"></i>
+                        Add Sticker
+                    </button>
+                    <button onclick="resetTextPos()" class="tool-btn">
+                        <i class="fa-solid fa-arrows-rotate text-amber-400 text-xl"></i>
+                        Center Text
+                    </button>
+                </div>
+
+                <!-- Hidden Inputs -->
+                <input type="file" id="bg-upload" class="hidden" accept="image/*" onchange="uploadImage(event, 'bg')">
+                <input type="file" id="img-upload" class="hidden" accept="image/*" onchange="uploadImage(event, 'layer')">
+
+                <p class="text-center text-[9px] text-zinc-600 font-black uppercase tracking-widest pt-4">Drag elements on screen to reposition</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('titan_pro_db')) || { folders: [{id: 1, name: 'MY WORK'}], projects: [] };
+        let currentFolderId = null, currentProjectId = null;
+
+        // Navigation
+        function showView(v) {
+            ['folders', 'projects', 'editor'].forEach(x => document.getElementById('view-'+x).classList.add('hidden'));
+            document.getElementById('view-'+v).classList.remove('hidden');
+        }
+
+        // Folder Management
+        function renderFolders() {
+            const list = document.getElementById('folder-list');
+            list.innerHTML = '';
+            db.folders.forEach(f => {
+                list.innerHTML += `<div onclick="openFolder(${f.id}, '${f.name}')" class="bg-zinc-900 p-5 rounded-3xl flex flex-col items-center gap-2 border border-white/5">
+                    <i class="fa-solid fa-folder text-4xl text-indigo-500"></i>
+                    <h3 class="text-[10px] font-black uppercase truncate w-full text-center">${f.name}</h3>
+                </div>`;
+            });
+        }
+
+        function addFolder() {
+            const n = prompt("Folder Name:");
+            if(n) { db.folders.push({id: Date.now(), name: n.toUpperCase()}); save(); renderFolders(); }
+        }
+
+        function openFolder(id, name) {
+            currentFolderId = id; document.getElementById('folder-title').innerText = name;
+            showView('projects'); renderProjects();
+        }
+
+        // Project Management
+        function renderProjects() {
+            const list = document.getElementById('project-list'); list.innerHTML = '';
+            db.projects.filter(p => p.folderId === currentFolderId).forEach(p => {
+                list.innerHTML += `<div onclick="openEditor(${p.id})" class="bg-zinc-900/50 p-4 rounded-2xl flex items-center gap-4 border border-white/5">
+                    <img src="${p.bg}" class="w-16 h-9 object-cover rounded-lg">
+                    <span class="text-xs font-black uppercase flex-1">${p.text}</span>
+                </div>`;
+            });
+        }
+
+        function addProject() {
+            const id = Date.now();
+            db.projects.push({id, folderId: currentFolderId, text: 'NEW THUMBNAIL', bg: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?w=1000', color: '#ffffff'});
+            save(); openEditor(id);
+        }
+
+        // Editor Logic
+        function openEditor(id) {
+            currentProjectId = id; 
+            const p = db.projects.find(x => x.id === id);
+            document.getElementById('main-text').innerText = p.text;
+            document.getElementById('main-text').style.color = p.color;
+            document.getElementById('text-input').value = p.text;
+            document.getElementById('canvas-bg').src = p.bg;
+            showView('editor');
+            makeDraggable(document.getElementById('main-text'));
+        }
+
+        function updateEditorText(v) {
+            document.getElementById('main-text').innerText = v.toUpperCase();
+            db.projects.find(x => x.id === currentProjectId).text = v.toUpperCase();
+            save();
+        }
+
+        function updateEditorColor(c) {
+            document.getElementById('main-text').style.color = c;
+            db.projects.find(x => x.id === currentProjectId).color = c;
+            save();
+        }
+
+        function uploadImage(event, type) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                if(type === 'bg') {
+                    document.getElementById('canvas-bg').src = reader.result;
+                    db.projects.find(x => x.id === currentProjectId).bg = reader.result;
+                    save();
+                } else {
+                    const img = document.createElement('img');
+                    img.src = reader.result;
+                    img.className = 'draggable w-32';
+                    img.style.top = '20%'; img.style.left = '20%';
+                    document.getElementById('overlay-images').appendChild(img);
+                    makeDraggable(img);
+                }
+            }
+            reader.readAsDataURL(event.target.files[0]);
+        }
+
+        function resetTextPos() {
+            const t = document.getElementById('main-text');
+            t.style.top = '40%'; t.style.left = '10%';
+        }
+
+        // Drag and Drop Logic (Mobile & Desktop)
+        function makeDraggable(el) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            el.onmousedown = dragMouseDown;
+            el.ontouchstart = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                pos3 = clientX; pos4 = clientY;
+                document.onmouseup = closeDragElement;
+                document.ontouchend = closeDragElement;
+                document.onmousemove = elementDrag;
+                document.ontouchmove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                pos1 = pos3 - clientX; pos2 = pos4 - clientY;
+                pos3 = clientX; pos4 = clientY;
+                el.style.top = (el.offsetTop - pos2) + "px";
+                el.style.left = (el.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null; document.onmousemove = null;
+                document.ontouchend = null; document.ontouchmove = null;
+            }
+        }
+
+        // Download PNG
+        function downloadImage() {
+            const area = document.getElementById('capture-area');
+            html2canvas(area, { useCORS: true }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'thumbnail-titan.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        function save() { localStorage.setItem('titan_pro_db', JSON.stringify(db)); }
+        renderFolders();
+    </script>
+</body>
+</html>
+
