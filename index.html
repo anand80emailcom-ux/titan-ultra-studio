@@ -621,3 +621,280 @@
 </body>
 </html>
 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TITAN ULTRA | Cloud Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;900&display=swap');
+        body { font-family: 'Outfit', sans-serif; background: #050508; color: white; margin: 0; overflow: hidden; }
+        .bebas { font-family: 'Bebas Neue', cursive; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .editor-container { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; }
+        .draggable { position: absolute; cursor: move; touch-action: none; user-select: none; }
+        input { outline: none; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. AUTH SCREEN (Login/Sign-up) -->
+    <div id="auth-screen" class="fixed inset-0 z-[500] bg-[#050508] flex items-center justify-center p-6">
+        <div class="w-full max-w-sm space-y-8 text-center">
+            <div class="inline-flex w-20 h-20 bg-indigo-600 rounded-[2.5rem] items-center justify-center shadow-2xl shadow-indigo-600/30">
+                <i class="fa-solid fa-bolt text-3xl"></i>
+            </div>
+            <div>
+                <h1 class="text-4xl font-black italic bebas tracking-widest">TITAN ULTRA</h1>
+                <p class="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Cloud Authentication</p>
+            </div>
+            
+            <div class="space-y-4">
+                <input id="user-email" type="email" placeholder="EMAIL ADDRESS" class="w-full bg-zinc-900/50 border border-white/5 p-5 rounded-2xl text-xs font-bold tracking-widest focus:border-indigo-600 transition-all">
+                <input id="user-pass" type="password" placeholder="PASSWORD" class="w-full bg-zinc-900/50 border border-white/5 p-5 rounded-2xl text-xs font-bold tracking-widest focus:border-indigo-600 transition-all">
+                <button onclick="handleAuth('login')" class="w-full bg-indigo-600 p-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">Login to Studio</button>
+                <button onclick="handleAuth('signup')" class="w-full bg-zinc-900 border border-white/10 p-5 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition-all">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MAIN APP CONTENT -->
+    <div id="app" class="h-screen flex flex-col hidden">
+        <!-- HEADER -->
+        <header class="p-5 flex justify-between items-center border-b border-white/5 bg-zinc-950/50">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <h1 class="text-sm font-black italic tracking-tighter">TITAN <span class="text-indigo-500">PRO</span></h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="user-display" class="text-[9px] font-black text-zinc-500 uppercase tracking-widest">User</span>
+                <button onclick="logout()" class="text-zinc-500 hover:text-rose-500 transition-colors"><i class="fa-solid fa-right-from-bracket"></i></button>
+            </div>
+        </header>
+
+        <!-- VIEW: FOLDERS -->
+        <main id="view-folders" class="flex-1 overflow-y-auto p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xs font-black uppercase tracking-widest text-zinc-500">Your Workspaces</h2>
+                <button onclick="addFolder()" class="text-indigo-500 font-black text-xs">+ NEW FOLDER</button>
+            </div>
+            <div id="folder-list" class="grid grid-cols-2 gap-4"></div>
+        </main>
+
+        <!-- VIEW: PROJECTS -->
+        <main id="view-projects" class="hidden flex-1 overflow-y-auto p-6">
+            <div class="flex items-center gap-4 mb-8">
+                <button onclick="showView('folders')" class="bg-zinc-900 w-10 h-10 rounded-xl flex items-center justify-center"><i class="fa-solid fa-chevron-left"></i></button>
+                <h2 id="folder-title" class="font-black uppercase tracking-widest text-sm">FOLDER</h2>
+            </div>
+            <button onclick="addProject()" class="w-full bg-indigo-600 p-5 rounded-[2rem] mb-8 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-indigo-600/20">Start New Production</button>
+            <div id="project-list" class="space-y-4"></div>
+        </main>
+
+        <!-- VIEW: EDITOR -->
+        <main id="view-editor" class="fixed inset-0 bg-black z-[200] hidden flex flex-col">
+            <nav class="p-4 flex justify-between items-center bg-zinc-950 border-b border-white/5">
+                <button onclick="showView('projects')" class="text-[10px] font-black uppercase tracking-widest">Exit</button>
+                <div class="flex gap-2">
+                    <button onclick="downloadImage()" class="bg-white text-black px-5 py-2 rounded-xl text-[10px] font-black uppercase">Render PNG</button>
+                </div>
+            </nav>
+
+            <div id="capture-area" class="editor-container shrink-0">
+                <img id="canvas-bg" src="https://images.unsplash.com/photo-1614850523296-d8c1af93d400?w=1000" class="w-full h-full object-cover">
+                <h2 id="main-text" class="draggable bebas text-white text-6xl text-center px-4 drop-shadow-2xl" style="top: 30%; left: 5%;">NEW DESIGN</h2>
+                <div id="overlay-layers"></div>
+            </div>
+
+            <div class="flex-1 bg-zinc-900/50 p-6 overflow-y-auto space-y-6">
+                <div class="space-y-2">
+                    <label class="text-[9px] font-black text-zinc-500 tracking-widest uppercase">Editor Headline</label>
+                    <input id="text-input" type="text" oninput="updateEditorText(this.value)" class="w-full bg-black border border-white/10 p-5 rounded-2xl font-black uppercase tracking-widest text-sm">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="document.getElementById('bg-upload').click()" class="bg-zinc-800 p-5 rounded-2xl flex flex-col items-center gap-2 border border-white/5">
+                        <i class="fa-solid fa-image text-indigo-400"></i>
+                        <span class="text-[9px] font-black uppercase tracking-widest">Change BG</span>
+                    </button>
+                    <button onclick="document.getElementById('sticker-upload').click()" class="bg-zinc-800 p-5 rounded-2xl flex flex-col items-center gap-2 border border-white/5">
+                        <i class="fa-solid fa-face-smile text-emerald-400"></i>
+                        <span class="text-[9px] font-black uppercase tracking-widest">Add Sticker</span>
+                    </button>
+                </div>
+
+                <input type="file" id="bg-upload" class="hidden" accept="image/*" onchange="handleImage(event, 'bg')">
+                <input type="file" id="sticker-upload" class="hidden" accept="image/*" onchange="handleImage(event, 'sticker')">
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // STATE MANAGEMENT
+        let currentUser = JSON.parse(localStorage.getItem('titan_user')) || null;
+        let db = JSON.parse(localStorage.getItem('titan_cloud_db')) || { folders: [], projects: [] };
+        let currentFolderId = null, currentProjectId = null;
+
+        // AUTH LOGIC
+        function handleAuth(type) {
+            const email = document.getElementById('user-email').value;
+            const pass = document.getElementById('user-pass').value;
+
+            if(!email || !pass) return alert("Fill all fields");
+
+            if(type === 'signup') {
+                currentUser = { email, uid: Date.now() };
+                alert("Account Created Successfully!");
+            } else {
+                // Mock Login
+                currentUser = { email, uid: 12345 };
+            }
+
+            localStorage.setItem('titan_user', JSON.stringify(currentUser));
+            initApp();
+        }
+
+        function logout() {
+            localStorage.removeItem('titan_user');
+            location.reload();
+        }
+
+        function initApp() {
+            if(currentUser) {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('app').classList.remove('hidden');
+                document.getElementById('user-display').innerText = currentUser.email.split('@')[0];
+                renderFolders();
+            }
+        }
+
+        // VIEW NAVIGATION
+        function showView(v) {
+            ['folders', 'projects', 'editor'].forEach(x => document.getElementById('view-'+x).classList.add('hidden'));
+            document.getElementById('view-'+v).classList.remove('hidden');
+        }
+
+        // FOLDERS & PROJECTS
+        function renderFolders() {
+            const list = document.getElementById('folder-list');
+            list.innerHTML = '';
+            db.folders.forEach(f => {
+                list.innerHTML += `
+                    <div onclick="openFolder(${f.id}, '${f.name}')" class="bg-zinc-900/50 p-6 rounded-[2rem] border border-white/5 flex flex-col items-center gap-3">
+                        <i class="fa-solid fa-folder text-3xl text-indigo-500"></i>
+                        <h3 class="text-[10px] font-black uppercase tracking-widest truncate w-full text-center">${f.name}</h3>
+                    </div>
+                `;
+            });
+        }
+
+        function addFolder() {
+            const n = prompt("FOLDER NAME:");
+            if(n) {
+                db.folders.push({ id: Date.now(), name: n.toUpperCase() });
+                save(); renderFolders();
+            }
+        }
+
+        function openFolder(id, name) {
+            currentFolderId = id; document.getElementById('folder-title').innerText = name;
+            showView('projects'); renderProjects();
+        }
+
+        function renderProjects() {
+            const list = document.getElementById('project-list'); list.innerHTML = '';
+            db.projects.filter(p => p.folderId === currentFolderId).forEach(p => {
+                list.innerHTML += `
+                    <div onclick="openEditor(${p.id})" class="bg-zinc-900 p-4 rounded-2xl flex items-center gap-4 border border-white/5">
+                        <img src="${p.bg}" class="w-16 h-9 object-cover rounded-lg">
+                        <span class="text-[10px] font-black uppercase tracking-widest truncate flex-1">${p.text}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function addProject() {
+            const id = Date.now();
+            db.projects.push({ id, folderId: currentFolderId, text: 'NEW THUMBNAIL', bg: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?w=1000' });
+            save(); openEditor(id);
+        }
+
+        // EDITOR FUNCTIONS
+        function openEditor(id) {
+            currentProjectId = id;
+            const p = db.projects.find(x => x.id === id);
+            document.getElementById('main-text').innerText = p.text;
+            document.getElementById('text-input').value = p.text;
+            document.getElementById('canvas-bg').src = p.bg;
+            showView('editor');
+            makeDraggable(document.getElementById('main-text'));
+        }
+
+        function updateEditorText(v) {
+            document.getElementById('main-text').innerText = v.toUpperCase();
+            db.projects.find(x => x.id === currentProjectId).text = v.toUpperCase();
+            save();
+        }
+
+        function handleImage(e, type) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                if(type === 'bg') {
+                    document.getElementById('canvas-bg').src = reader.result;
+                    db.projects.find(x => x.id === currentProjectId).bg = reader.result;
+                    save();
+                } else {
+                    const img = document.createElement('img');
+                    img.src = reader.result;
+                    img.className = 'draggable w-32';
+                    img.style.top = '20%'; img.style.left = '20%';
+                    document.getElementById('overlay-layers').appendChild(img);
+                    makeDraggable(img);
+                }
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+
+        function makeDraggable(el) {
+            let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
+            el.onmousedown = start; el.ontouchstart = start;
+            function start(e) {
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                p3 = cx; p4 = cy;
+                document.onmouseup = stop; document.ontouchend = stop;
+                document.onmousemove = move; document.ontouchmove = move;
+            }
+            function move(e) {
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                p1 = p3 - cx; p2 = p4 - cy; p3 = cx; p4 = cy;
+                el.style.top = (el.offsetTop - p2) + "px";
+                el.style.left = (el.offsetLeft - p1) + "px";
+            }
+            function stop() { document.onmouseup = null; document.onmousemove = null; document.ontouchend = null; document.ontouchmove = null; }
+        }
+
+        function downloadImage() {
+            html2canvas(document.getElementById('capture-area'), { useCORS: true }).then(canvas => {
+                const a = document.createElement('a');
+                a.href = canvas.toDataURL(); a.download = 'titan-export.png'; a.click();
+            });
+        }
+
+        function save() { localStorage.setItem('titan_cloud_db', JSON.stringify(db)); }
+        
+        // BOOT APP
+        initApp();
+    </script>
+</body>
+</html>
+
+    
