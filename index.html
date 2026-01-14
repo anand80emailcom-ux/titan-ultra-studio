@@ -867,35 +867,7 @@
             el.onmousedown = start; el.ontouchstart = start;
             function start(e) {
                 const cx = e.touches ? e.touches[0].clientX : e.clientX;
-                const cy = e.touches ? e.touches[0].clientY : e.clientY;
-                p3 = cx; p4 = cy;
-                document.onmouseup = stop; document.ontouchend = stop;
-                document.onmousemove = move; document.ontouchmove = move;
-            }
-            function move(e) {
-                const cx = e.touches ? e.touches[0].clientX : e.clientX;
-                const cy = e.touches ? e.touches[0].clientY : e.clientY;
-                p1 = p3 - cx; p2 = p4 - cy; p3 = cx; p4 = cy;
-                el.style.top = (el.offsetTop - p2) + "px";
-                el.style.left = (el.offsetLeft - p1) + "px";
-            }
-            function stop() { document.onmouseup = null; document.onmousemove = null; document.ontouchend = null; document.ontouchmove = null; }
-        }
-
-        function downloadImage() {
-            html2canvas(document.getElementById('capture-area'), { useCORS: true }).then(canvas => {
-                const a = document.createElement('a');
-                a.href = canvas.toDataURL(); a.download = 'titan-export.png'; a.click();
-            });
-        }
-
-        function save() { localStorage.setItem('titan_cloud_db', JSON.stringify(db)); }
-        
-        // BOOT APP
-        initApp();
-    </script>
-</body>
-</html
+                const cy = e.touches ? e.touc
 
 <!DOCTYPE html>
 <html lang="hi">
